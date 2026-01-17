@@ -4,14 +4,14 @@ const OpenAI = require("openai");
 const multer = require("multer");
 require("dotenv").config();
 
-const app = express();
-app.use(cors());
-
-const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } });
-
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const app = express();
+const upload = multer();
+
+app.use(cors());
 
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
@@ -19,7 +19,7 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
       return res.status(400).json({ error: "Image missing" });
     }
 
-    const imageBase64 = req.file.buffer.toString("base64");
+    const base64Image = req.file.buffer.toString("base64");
 
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
@@ -30,45 +30,32 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
             {
               type: "input_text",
               text: `
-You are a car analysis AI.
 Return ONLY valid JSON.
-No markdown.
-No explanations.
 
 {
   "brand": "string",
   "model": "string",
   "year": "string",
-  "price": {
-    "min": number,
-    "max": number
-  },
-  "ncap": {
-    "adult": number,
-    "child": number
-  }
+  "price": { "min": number, "max": number },
+  "ncap": { "adult": number, "child": number }
 }
-              `
+`
             },
             {
               type: "input_image",
-              image_url: `data:image/jpeg;base64,${imageBase64}`
+              image_url: `data:image/jpeg;base64,${base64Image}`
             }
           ]
         }
       ]
     });
 
-    const aiText = response.output_text;
-    const aiResult = JSON.parse(aiText);
-
+    const aiResult = JSON.parse(response.output_text);
     res.json(aiResult);
+
   } catch (err) {
     console.error("❌ AI ERROR:", err);
-    res.status(500).json({
-      error: "Analysis failed",
-      details: err.message,
-    });
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
