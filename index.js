@@ -54,8 +54,10 @@ Analyze the car in the image and return this exact JSON format:
               `
             },
             {
+              {
   type: "input_image",
   image_base64: image
+            }
   }
 }
 
