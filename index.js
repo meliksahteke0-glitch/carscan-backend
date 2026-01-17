@@ -1,13 +1,13 @@
 const express = require("express");
 const cors = require("cors");
-const multer = require("multer");
 const OpenAI = require("openai");
+const multer = require("multer");
 require("dotenv").config();
 
 const app = express();
-const upload = multer();
-
 app.use(cors());
+
+const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } });
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -16,13 +16,11 @@ const openai = new OpenAI({
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "Image file missing" });
+      return res.status(400).json({ error: "Image missing" });
     }
 
-    // 1️⃣ File → base64 (backend yapıyor)
-    const base64Image = req.file.buffer.toString("base64");
+    const imageBase64 = req.file.buffer.toString("base64");
 
-    // 2️⃣ OpenAI Vision çağrısı (eski çalışan mantık)
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: [
@@ -36,8 +34,6 @@ You are a car analysis AI.
 Return ONLY valid JSON.
 No markdown.
 No explanations.
-
-Analyze the car image and return EXACTLY this JSON:
 
 {
   "brand": "string",
@@ -56,21 +52,20 @@ Analyze the car image and return EXACTLY this JSON:
             },
             {
               type: "input_image",
-              image_url: `data:image/jpeg;base64,${base64Image}`
+              image_url: `data:image/jpeg;base64,${imageBase64}`
             }
           ]
         }
       ]
     });
 
-    const resultText = response.output_text;
-    const resultJson = JSON.parse(resultText);
+    const aiText = response.output_text;
+    const aiResult = JSON.parse(aiText);
 
-    return res.json(resultJson);
-
+    res.json(aiResult);
   } catch (err) {
     console.error("❌ AI ERROR:", err);
-    return res.status(500).json({
+    res.status(500).json({
       error: "Analysis failed",
       details: err.message,
     });
@@ -81,3 +76,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚗 CarScan backend running on port ${PORT}`);
 });
+
