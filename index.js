@@ -5,7 +5,7 @@ require("dotenv").config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "15mb" }));
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -13,12 +13,27 @@ const openai = new OpenAI({
 
 app.post("/analyze", async (req, res) => {
   try {
+    const { image } = req.body;
+
+    // 1️⃣ Güvenlik kontrolü
+    if (!image || typeof image !== "string") {
+      return res.status(400).json({
+        error: "Image is missing or invalid",
+      });
+    }
+
+    // 2️⃣ OpenAI çağrısı (DOĞRU FORMAT)
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
-      input: `
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: `
 You are a car analysis AI.
 
-Assume the user sent an image of a car.
 Return ONLY valid JSON.
 No markdown.
 No explanations.
@@ -26,32 +41,49 @@ No explanations.
 Return this exact format:
 
 {
-  "brand": "Toyota",
-  "model": "Corolla",
-  "year": "2020",
+  "brand": "string",
+  "model": "string",
+  "year": "string",
   "price": {
-    "min": 18000,
-    "max": 24000
+    "min": number,
+    "max": number
   },
   "ncap": {
-    "adult": 90,
-    "child": 85
+    "adult": number,
+    "child": number
   }
 }
-      `,
+              `.trim(),
+            },
+            {
+              type: "input_image",
+              image_base64: image,
+            },
+          ],
+        },
+      ],
     });
 
+    // 3️⃣ AI çıktısını al
     const aiText = response.output_text;
+
+    if (!aiText) {
+      throw new Error("No output from AI");
+    }
+
     const aiResult = JSON.parse(aiText);
 
     return res.json(aiResult);
   } catch (err) {
-    console.error("❌ ERROR:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error("❌ AI ERROR:", err);
+    return res.status(500).json({
+      error: "Server error",
+      details: err.message,
+    });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚗 Backend running on port ${PORT}`);
+  console.log(`🚗 Carscan backend running on port ${PORT}`);
 });
