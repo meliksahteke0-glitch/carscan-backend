@@ -15,6 +15,7 @@ app.use(express.json({ limit: "15mb" }));
 app.post("/analyze", async (req, res) => {
   try {
     const { image } = req.body;
+const imageBase64 = `data:image/jpeg;base64,${image}`;
 
     if (!image) {
       return res.status(400).json({ error: "Image missing" });
