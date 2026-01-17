@@ -13,16 +13,17 @@ const openai = new OpenAI({
 
 app.post("/analyze", async (req, res) => {
   try {
-    const { image } = req.body;
+    const { image_base64 } = req.body;
 
-    // 1️⃣ Güvenlik kontrolü
-    if (!image || typeof image !== "string") {
+    if (!image_base64 || typeof image_base64 !== "string") {
       return res.status(400).json({
-        error: "Image is missing or invalid",
+        error: "image_base64 is missing or invalid",
       });
     }
 
-    // 2️⃣ OpenAI çağrısı (DOĞRU FORMAT)
+    // 🔴 EN KRİTİK SATIR
+    const imageDataUrl = `data:image/jpeg;base64,${image_base64}`;
+
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: [
@@ -33,7 +34,6 @@ app.post("/analyze", async (req, res) => {
               type: "input_text",
               text: `
 You are a car analysis AI.
-
 Return ONLY valid JSON.
 No markdown.
 No explanations.
@@ -53,24 +53,18 @@ Return this exact format:
     "child": number
   }
 }
-              `.trim(),
+              `,
             },
             {
               type: "input_image",
-              image_base64: image,
+              image_url: imageDataUrl,
             },
           ],
         },
       ],
     });
 
-    // 3️⃣ AI çıktısını al
     const aiText = response.output_text;
-
-    if (!aiText) {
-      throw new Error("No output from AI");
-    }
-
     const aiResult = JSON.parse(aiText);
 
     return res.json(aiResult);
@@ -85,5 +79,5 @@ Return this exact format:
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚗 Carscan backend running on port ${PORT}`);
+  console.log(`🚗 CarScan backend running on port ${PORT}`);
 });
