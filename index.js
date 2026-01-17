@@ -1,12 +1,13 @@
-import express from "express";
-import cors from "cors";
-import multer from "multer";
-import OpenAI from "openai";
+const express = require("express");
+const cors = require("cors");
+const multer = require("multer");
+const OpenAI = require("openai");
+require("dotenv").config();
 
 const app = express();
-app.use(cors());
+const upload = multer();
 
-const upload = multer({ storage: multer.memoryStorage() });
+app.use(cors());
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -15,35 +16,68 @@ const openai = new OpenAI({
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "No image uploaded" });
+      return res.status(400).json({ error: "Image file missing" });
     }
 
+    // 1️⃣ File → base64 (backend yapıyor)
     const base64Image = req.file.buffer.toString("base64");
 
+    // 2️⃣ OpenAI Vision çağrısı (eski çalışan mantık)
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: [
         {
           role: "user",
           content: [
-            { type: "input_text", text: "Analyze this car image and return JSON." },
+            {
+              type: "input_text",
+              text: `
+You are a car analysis AI.
+Return ONLY valid JSON.
+No markdown.
+No explanations.
+
+Analyze the car image and return EXACTLY this JSON:
+
+{
+  "brand": "string",
+  "model": "string",
+  "year": "string",
+  "price": {
+    "min": number,
+    "max": number
+  },
+  "ncap": {
+    "adult": number,
+    "child": number
+  }
+}
+              `
+            },
             {
               type: "input_image",
-              image_url: `data:image/jpeg;base64,${base64Image}`,
-            },
-          ],
-        },
-      ],
+              image_url: `data:image/jpeg;base64,${base64Image}`
+            }
+          ]
+        }
+      ]
     });
 
-    const text = response.output_text;
-    const json = JSON.parse(text);
+    const resultText = response.output_text;
+    const resultJson = JSON.parse(resultText);
 
-    res.json(json);
+    return res.json(resultJson);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("❌ AI ERROR:", err);
+    return res.status(500).json({
+      error: "Analysis failed",
+      details: err.message,
+    });
   }
 });
 
-app.listen(3000, () => console.log("Backend running on 3000"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚗 CarScan backend running on port ${PORT}`);
+});
