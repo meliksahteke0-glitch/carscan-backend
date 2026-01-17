@@ -5,7 +5,7 @@ require("dotenv").config();
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "15mb" }));
+app.use(express.json({ limit: "20mb" }));
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -13,16 +13,22 @@ const openai = new OpenAI({
 
 app.post("/analyze", async (req, res) => {
   try {
-    const { image_base64 } = req.body;
+    const { imageUrl } = req.body;
 
-    if (!image_base64 || typeof image_base64 !== "string") {
-      return res.status(400).json({ error: "image_base64 missing" });
+    if (!imageUrl) {
+      return res.status(400).json({ error: "imageUrl is required" });
     }
 
-    // 🚨 EN KRİTİK SATIR
-    const imageDataUrl = `data:image/jpeg;base64,${image_base64}`;
+    // 1️⃣ Image indir
+    const response = await fetch(imageUrl);
+    const buffer = Buffer.from(await response.arrayBuffer());
 
-    const response = await openai.responses.create({
+    // 2️⃣ Base64 DATA URL
+    const base64Image =
+      "data:image/jpeg;base64," + buffer.toString("base64");
+
+    // 3️⃣ OpenAI
+    const aiResponse = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: [
         {
@@ -32,42 +38,39 @@ app.post("/analyze", async (req, res) => {
               type: "input_text",
               text: `
 You are a car analysis AI.
-Return ONLY valid JSON.
-No markdown. No explanations.
+Look at the image and return ONLY valid JSON.
 
 Format:
 {
-  "brand": "string",
-  "model": "string",
-  "year": "string",
-  "price": { "min": number, "max": number },
-  "ncap": { "adult": number, "child": number }
+  "brand": "",
+  "model": "",
+  "year": "",
+  "price": { "min": 0, "max": 0 },
+  "ncap": { "adult": 0, "child": 0 }
 }
               `,
             },
             {
               type: "input_image",
-              image_url: imageDataUrl,
+              image_url: base64Image,
             },
           ],
         },
       ],
     });
 
-    const aiText = response.output_text;
-    const aiResult = JSON.parse(aiText);
+    const text = aiResponse.output_text;
+    const json = JSON.parse(text);
 
-    return res.json(aiResult);
+    return res.json(json);
   } catch (err) {
-    console.error("AI ERROR:", err);
-    return res.status(500).json({
-      error: "Server error",
-      details: err.message,
-    });
+    console.error("❌ analyze error:", err);
+    return res.status(500).json({ error: "analysis failed" });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚗 Backend running on port ${PORT}`);
-});
+app.listen(PORT, () =>
+  console.log(`🚀 Backend running on port ${PORT}`)
+);
+
