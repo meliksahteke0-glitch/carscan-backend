@@ -15,10 +15,11 @@ app.use(express.json({ limit: "15mb" }));
 app.post("/analyze", async (req, res) => {
   try {
     const { image } = req.body;
-const imageBase64 = `data:image/jpeg;base64,${image}`;
 
-    if (!image) {
-      return res.status(400).json({ error: "Image missing" });
+  if (!image || typeof image !== "string") {
+    return res.status(400).json({
+      error: "Image is missing or invalid"
+    });
     }
 
     const response = await openai.responses.create({
@@ -53,9 +54,12 @@ Analyze the car in the image and return this exact JSON format:
               `
             },
             {
-              type: "input_image",
-              image_url: `data:image/jpeg;base64,${image}`
-            }
+  type: "input_image",
+  image_url: {
+    url: `data:image/jpeg;base64,${image}`
+  }
+}
+
           ]
         }
       ]
