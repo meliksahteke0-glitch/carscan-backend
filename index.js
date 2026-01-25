@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
-const OpenAI = require("openai");
 const multer = require("multer");
+const OpenAI = require("openai");
 require("dotenv").config();
 
 const app = express();
@@ -15,10 +15,10 @@ const openai = new OpenAI({
 
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
-    console.log("📩 /analyze called");
+    console.log("📥 Request received");
 
     if (!req.file) {
-      console.error("❌ No file received");
+      console.log("❌ No image received");
       return res.status(400).json({ error: "Image missing" });
     }
 
@@ -35,7 +35,6 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
             {
               type: "input_text",
               text: `
-You are a car analysis AI.
 Return ONLY valid JSON.
 No markdown.
 No explanation.
@@ -47,27 +46,25 @@ No explanation.
   "price": { "min": number, "max": number },
   "ncap": { "adult": number, "child": number }
 }
-`
+              `,
             },
             {
               type: "input_image",
-              image_url: `data:image/jpeg;base64,${base64Image}`
-            }
-          ]
-        }
-      ]
+              image_url: `data:image/jpeg;base64,${base64Image}`,
+            },
+          ],
+        },
+      ],
     });
 
-    const text = response.output_text;
-    console.log("🤖 AI raw output:", text);
+    const outputText = response.output_text;
+    console.log("🤖 AI RAW OUTPUT:", outputText);
 
-    const parsed = JSON.parse(text);
-    console.log("✅ Parsed result:", parsed);
-
-    res.json(parsed);
+    const parsed = JSON.parse(outputText);
+    return res.json(parsed);
 
   } catch (err) {
-    console.error("🔥 BACKEND ERROR:", err);
+    console.error("🔥 SERVER ERROR:", err);
     res.status(500).json({
       error: "Analysis failed",
       details: err.message,
@@ -79,3 +76,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚗 CarScan backend running on port ${PORT}`);
 });
+
