@@ -4,14 +4,18 @@ const OpenAI = require("openai");
 const multer = require("multer");
 require("dotenv").config();
 
+const app = express();
+
+app.use(cors());
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-const app = express();
-const upload = multer();
-
-app.use(cors());
 
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
@@ -30,7 +34,10 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
             {
               type: "input_text",
               text: `
+You are a car analysis AI.
 Return ONLY valid JSON.
+No markdown.
+No explanations.
 
 {
   "brand": "string",
@@ -39,7 +46,7 @@ Return ONLY valid JSON.
   "price": { "min": number, "max": number },
   "ncap": { "adult": number, "child": number }
 }
-`
+              `
             },
             {
               type: "input_image",
@@ -50,8 +57,8 @@ Return ONLY valid JSON.
       ]
     });
 
-    const aiResult = JSON.parse(response.output_text);
-    res.json(aiResult);
+    const result = JSON.parse(response.output_text);
+    res.json(result);
 
   } catch (err) {
     console.error("❌ AI ERROR:", err);
@@ -63,4 +70,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚗 CarScan backend running on port ${PORT}`);
 });
-
