@@ -1,7 +1,7 @@
 {
   "name": "carscan-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "CarScan backend",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
