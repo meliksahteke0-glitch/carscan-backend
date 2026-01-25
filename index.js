@@ -1,59 +1,32 @@
 const express = require("express");
 const cors = require("cors");
-const OpenAI = require("openai");
 const multer = require("multer");
+const OpenAI = require("openai");
 require("dotenv").config();
 
 const app = express();
+const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
 
-/* =========================
-   BASIC SETUP
-========================= */
-app.use(cors());
-
-const upload = multer({
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10 MB
-  },
-});
-
-/* =========================
-   OPENAI
-========================= */
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-/* =========================
-   HEALTH CHECK
-========================= */
-app.get("/", (req, res) => {
-  res.send("CarScan backend is running");
-});
+app.use(cors());
 
-/* =========================
-   ANALYZE ENDPOINT
-========================= */
 app.post("/analyze", upload.single("image"), async (req, res) => {
-  console.log("📥 /analyze HIT");
+  console.log("📥 /analyze endpoint hit");
 
   try {
-    console.log("➡️ Headers:", req.headers);
-
     if (!req.file) {
-      console.error("❌ NO FILE RECEIVED");
+      console.error("❌ No file received");
       return res.status(400).json({ error: "Image missing" });
     }
 
-    console.log("✅ File received");
-    console.log("📄 File info:", {
-      fieldname: req.file.fieldname,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-    });
+    console.log("✅ Image received");
+    console.log("📏 Size:", req.file.size);
+    console.log("🖼️ Type:", req.file.mimetype);
 
     const base64Image = req.file.buffer.toString("base64");
-    console.log("🧠 Base64 length:", base64Image.length);
 
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
@@ -65,46 +38,40 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
               type: "input_text",
               text: `
 You are a car analysis AI.
-
 Return ONLY valid JSON.
 No markdown.
-No explanations.
+No explanation.
 
-Analyze the car in the image and return EXACTLY this format:
+Return this exact JSON format:
 
 {
   "brand": "string",
   "model": "string",
   "year": "string",
-  "price": {
-    "min": number,
-    "max": number
-  },
-  "ncap": {
-    "adult": number,
-    "child": number
-  }
+  "price": { "min": number, "max": number },
+  "ncap": { "adult": number, "child": number }
 }
-              `,
+              `
             },
             {
               type: "input_image",
-              image_url: `data:image/jpeg;base64,${base64Image}`,
-            },
-          ],
-        },
-      ],
+              image_url: `data:image/jpeg;base64,${base64Image}`
+            }
+          ]
+        }
+      ]
     });
 
-    console.log("🤖 OpenAI raw output:", response.output_text);
+    console.log("🤖 OpenAI response received");
 
-    const aiResult = JSON.parse(response.output_text);
+    const aiText = response.output_text;
+    console.log("🧠 AI RAW OUTPUT:", aiText);
 
-    console.log("✅ Parsed AI result:", aiResult);
-
+    const aiResult = JSON.parse(aiText);
     return res.json(aiResult);
+
   } catch (err) {
-    console.error("🔥 ANALYZE ERROR:", err);
+    console.error("🔥 SERVER ERROR:", err);
     return res.status(500).json({
       error: "Server error",
       details: err.message,
@@ -112,9 +79,6 @@ Analyze the car in the image and return EXACTLY this format:
   }
 });
 
-/* =========================
-   START SERVER
-========================= */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚗 CarScan backend running on port ${PORT}`);
